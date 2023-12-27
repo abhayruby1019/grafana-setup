@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cadvisor
+  namespace: infratools
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cadvisor-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cadvisor-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: cadvisor
+    namespace: infratools
+roleRef:
+  kind: ClusterRole
+  name: cadvisor-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cadvisor-daemonset
+spec:
+  selector:
+    matchLabels:
+      app: cadvisor
+  template:
+    metadata:
+      labels:
+        app: cadvisor
+    spec:
+      serviceAccountName: cadvisor
+      containers:
+        - name: cadvisor
+          image: k8s.gcr.io/cadvisor:v0.39.0
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              memory: "200Mi"
+              cpu: "100m"
+            requests:
+              memory: "100Mi"
+              cpu: "50m"
+          volumeMounts:
+            - mountPath: /var/run
+              name: run
+            - mountPath: /sys/fs/cgroup
+              name: cgroup
+            - mountPath: /var/lib/docker
+              name: docker
+            - mountPath: /var/lib/kubelet
+              name: kubelet
+      volumes:
+        - name: run
+          hostPath:
+            path: /var/run
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: docker
+          hostPath:
+            path: /var/lib/docker
+        - name: kubelet
+          hostPath:
+            path: /var/lib/kubelet
